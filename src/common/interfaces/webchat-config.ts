@@ -409,6 +409,7 @@ export interface IWebchatSettings {
 			timeout: number;
 			title: string;
 		};
+		webchatRoot: string;
 	};
 
 	// Additional Settings to configure the webchat widget behavior
