@@ -74,9 +74,20 @@ const initWebchat = async (
 		...settings?.embeddingConfiguration,
 		_endpointTokenUrl: webchatConfigUrl,
 	} as Partial<IWebchatSettings>["embeddingConfiguration"];
-	const webchatRoot = document.createElement("div");
-	document.body.appendChild(webchatRoot);
-
+	let webchatRoot = document.createElement("div");
+	
+	// Check if a custom webchat root is provided in the settings and use it if available
+	// If not found or if it's no div element just use the default webchatRoot
+	let customWebchatRoot: unknown = null;
+	if (settings?.embeddingConfiguration?.webchatRoot && settings.embeddingConfiguration.webchatRoot !== "") {
+		customWebchatRoot = document.getElementById(settings.embeddingConfiguration.webchatRoot);
+	}
+	if (customWebchatRoot && customWebchatRoot instanceof HTMLDivElement) {
+		webchatRoot = customWebchatRoot as HTMLDivElement;
+	} else {
+		document.body.appendChild(webchatRoot);
+	}
+	
 	let cognigyWebchat: Webchat | null = null;
 
 	const root = createRoot(webchatRoot);
