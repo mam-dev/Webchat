@@ -102,9 +102,11 @@ export const getInitialState = (): ConfigState => ({
 				enabled: true,
 				starters: [],
 			},
-			loginAndStartConversation: {
+			loginAndStartConversationButton: {
 				enabled: false,
 				buttonText: "Login and start conversation",
+				type: "web_url",
+				payload: "",
 			},
 		},
 		teaserMessage: {
