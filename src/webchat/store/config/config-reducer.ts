@@ -102,6 +102,10 @@ export const getInitialState = (): ConfigState => ({
 				enabled: true,
 				starters: [],
 			},
+			loginAndStartConversation: {
+				enabled: false,
+				buttonText: "Login and start conversation",
+			},
 		},
 		teaserMessage: {
 			text: "",

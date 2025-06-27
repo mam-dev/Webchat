@@ -220,6 +220,13 @@ export interface IWebchatSettings {
 			color: string;
 		};
 		startConversationButtonText: string;
+		loginAndStartConversation: {
+			enabled: boolean;
+			buttonText: string;
+			url?: string;
+			handler?: string;
+			payload?: string;
+		};
 		previousConversations: {
 			startNewConversationButtonText: string;
 			enableDeleteAllConversations?: boolean;
