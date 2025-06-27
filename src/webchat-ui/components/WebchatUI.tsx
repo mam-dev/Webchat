@@ -72,6 +72,7 @@ import getMessagesListWithoutControlCommands from "../utils/filter-out-control-c
 import { removeMarkdownChars } from "../../webchat/helper/handleMarkdown";
 import DeleteAllConversationsModal from "./presentational/previous-conversations/DeleteAllConversations";
 import ScreenReaderLiveRegion from "./presentational/ScreenReaderLiveRegion";
+import { LoginHandler } from "../../common/interfaces/login-handler";
 
 export interface WebchatUIProps {
 	currentSession: string;
@@ -873,6 +874,34 @@ export class WebchatUI extends React.PureComponent<
 		}
 	};
 
+	handleLoginAndStartConversation = () => {
+		const payload = this.props.config.settings.homeScreen.loginAndStartConversationButton.payload;
+		const userId = this.props.options?.userId || "";
+		const sessionId = this.props.currentSession;
+		if (payload && payload !== "") {
+			if (this.props.config.settings.homeScreen.loginAndStartConversationButton.type && 
+				this.props.config.settings.homeScreen.loginAndStartConversationButton.type === "handler") {
+				// type = handler
+				try {
+					const handlerFunction = payload as LoginHandler;
+					if (typeof handlerFunction === 'function') {
+						handlerFunction(userId, sessionId);
+					} 
+				} catch (error) {
+					console.error(`Error calling handler function '${payload}':`, error);
+				}
+			} else {
+				// type = url
+				if (payload) {
+					const url = new URL(payload as string, window.location.origin);
+					url.searchParams.append('userId', userId);
+					url.searchParams.append('sessionId', sessionId);
+					window.location.href = url.toString();
+				}
+			}
+		}
+	};
+
 	// TODO: move the logic to middleware
 	handleFabClick = () => {
 		this.props.onToggle();
@@ -1472,6 +1501,7 @@ export class WebchatUI extends React.PureComponent<
 							closeButtonRef={this.homeScreenCloseButtonRef}
 							onSetShowHomeScreen={onSetShowHomeScreen}
 							onStartConversation={this.handleStartConversation}
+							onLoginAndStartConversation={this.handleLoginAndStartConversation}
 							onSetShowPrevConversations={onSetShowPrevConversations}
 							onClose={handleOnMinimize}
 							config={config}

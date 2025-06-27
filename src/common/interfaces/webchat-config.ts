@@ -1,3 +1,5 @@
+import { LoginHandler } from "./login-handler";
+
 export type TSourceDirection = "incoming" | "outgoing";
 export type TSourceColorV2 = "primary" | "neutral";
 export type TSourceColor = "bot" | "user";
@@ -220,6 +222,12 @@ export interface IWebchatSettings {
 			color: string;
 		};
 		startConversationButtonText: string;
+		loginAndStartConversationButton: {
+			enabled: boolean;
+			buttonText: string;
+			type: "web_url" | "handler";
+			payload: string | LoginHandler;
+		};
 		previousConversations: {
 			startNewConversationButtonText: string;
 			enableDeleteAllConversations?: boolean;

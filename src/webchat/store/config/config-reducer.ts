@@ -96,10 +96,17 @@ export const getInitialState = (): ConfigState => ({
 				enabled: true,
 				buttonText: "Previous conversations",
 				title: "",
+				startNewConversationButtonText: ""
 			},
 			conversationStarters: {
 				enabled: true,
 				starters: [],
+			},
+			loginAndStartConversationButton: {
+				enabled: false,
+				buttonText: "Login and start conversation",
+				type: "web_url",
+				payload: "",
 			},
 		},
 		teaserMessage: {
@@ -173,6 +180,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 				timeout: 2000,
 				title: "",
 			},
+			webchatRoot: "",
 		},
 
 		// Additional Settings to configure the webchat widget behavior

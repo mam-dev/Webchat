@@ -162,6 +162,7 @@ interface IHomeScreenProps {
 	onEmitAnalytics: WebchatUIProps["onEmitAnalytics"];
 	onSendActionButtonMessage: WebchatUIProps["onSendMessage"];
 	onStartConversation: () => void;
+	onLoginAndStartConversation: () => void;
 }
 
 export const HomeScreen: React.FC<IHomeScreenProps> = props => {
@@ -175,6 +176,7 @@ export const HomeScreen: React.FC<IHomeScreenProps> = props => {
 		onEmitAnalytics,
 		onSendActionButtonMessage,
 		onStartConversation,
+		onLoginAndStartConversation
 	} = props;
 
 	const homeScreenRef = useRef<HTMLDivElement>(null);
@@ -269,6 +271,15 @@ export const HomeScreen: React.FC<IHomeScreenProps> = props => {
 				)}
 			</HomeScreenContent>
 			<HomeScreenActions className="webchat-homescreen-actions">
+				{config.settings.homeScreen.loginAndStartConversationButton.enabled && (
+					<StartButton
+						onClick={onLoginAndStartConversation}
+						className="webchat-homescreen-send-button"
+						data-test="webchat-start-chat-button"
+					>
+						{config.settings.homeScreen.loginAndStartConversationButton.buttonText || "Login and start conversation"}
+					</StartButton>
+				)}
 				<StartButton
 					onClick={onStartConversation}
 					className="webchat-homescreen-send-button"
