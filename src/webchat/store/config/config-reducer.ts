@@ -201,6 +201,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 			enableDefaultPreview: false,
 			ignoreLineBreaks: false,
 			STTLanguage: "",
+			customAllowedHtmlTags: undefined,
 
 			sourceDirectionMapping: {
 				agent: "incoming",
