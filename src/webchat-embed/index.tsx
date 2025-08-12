@@ -119,3 +119,5 @@ window.initWebchat = initWebchat;
 window.__COGNIGY_WEBCHAT = {
 	React,
 };
+
+export { initWebchat };
