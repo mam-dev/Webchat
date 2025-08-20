@@ -258,7 +258,7 @@ export const HomeScreen: React.FC<IHomeScreenProps> = props => {
 					className="webchat-homescreen-title"
 					id="webchatHeaderTitle"
 				>
-					{homeScreen.welcomeText || "Welcome to the Cognigy Webchat"}
+					<div dangerouslySetInnerHTML={{ __html: homeScreen.welcomeText || "Welcome to the Cognigy Webchat" }} />
 				</HomeScreenTitle>
 				{homeScreen?.conversationStarters?.enabled && (
 					<HomeScreenButtons className="webchat-homescreen-buttons">
