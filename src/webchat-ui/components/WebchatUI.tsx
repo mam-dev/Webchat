@@ -20,7 +20,7 @@ import "../utils/normalize.css";
 import { MessageSender } from "../interfaces";
 import FAB from "./presentational/FAB";
 import WebchatWrapper from "./presentational/WebchatWrapper";
-import ChatIcon from "../assets/baseline-chat-24px.svg";
+import ChatIcon from "./presentational/ChatIcon";
 import CollapseIcon from "../assets/collapse-20px.svg";
 import DisconnectOverlay from "./presentational/DisconnectOverlay";
 import { IWebchatConfig } from "../../common/interfaces/webchat-config";
@@ -71,6 +71,7 @@ import getMessagesListWithoutControlCommands from "../utils/filter-out-control-c
 import { removeMarkdownChars } from "../../webchat/helper/handleMarkdown";
 import DeleteAllConversationsModal from "./presentational/previous-conversations/DeleteAllConversations";
 import ScreenReaderLiveRegion from "./presentational/ScreenReaderLiveRegion";
+import classNames from "classnames";
 import { LoginHandler } from "../../common/interfaces/login-handler";
 
 export interface WebchatUIProps {
@@ -504,6 +505,7 @@ export class WebchatUI extends React.PureComponent<
 			inputPlugins: [...(this.props.inputPlugins || []), baseInputPlugin],
 			messagePlugins: [...(this.props.messagePlugins || []), ...defaultMessagePlugins],
 		});
+		this.setupIconAnimationInterval();
 	}
 
 	async componentDidUpdate(prevProps: WebchatUIProps, prevState: WebchatUIState) {
@@ -628,6 +630,18 @@ export class WebchatUI extends React.PureComponent<
 			this.setState({ lastUnseenMessageText: "" });
 		}
 
+		// Re-evaluate icon animation interval when related settings change
+		if (
+			prevProps?.config?.settings?.layout?.iconAnimationInterval !==
+				this.props?.config?.settings?.layout?.iconAnimationInterval ||
+			prevProps?.config?.settings?.layout?.iconAnimationSpeed !==
+				this.props?.config?.settings?.layout?.iconAnimationSpeed ||
+			prevProps?.config?.settings?.layout?.iconAnimation !==
+				this.props?.config?.settings?.layout?.iconAnimation
+		) {
+			this.setupIconAnimationInterval();
+		}
+
 		if (!this.hideNotifications) {
 			// initialize the title indicator if configured
 			if (this.props.config.settings.unreadMessages.enableIndicator) {
@@ -661,6 +675,39 @@ export class WebchatUI extends React.PureComponent<
 			clearTimeout(this.engagementMessageTimeout);
 			this.engagementMessageTimeout = null;
 		}
+
+		// Teardown icon animation interval
+		if (this.iconAnimationIntervalHandle) {
+			clearInterval(this.iconAnimationIntervalHandle);
+			this.iconAnimationIntervalHandle = null;
+		}
+	}
+
+	private iconAnimationIntervalHandle: ReturnType<typeof setInterval> | null = null;
+
+	private setupIconAnimationInterval() {
+		if (this.iconAnimationIntervalHandle) {
+			clearInterval(this.iconAnimationIntervalHandle);
+			this.iconAnimationIntervalHandle = null;
+		}
+		const animation = this.props?.config?.settings?.layout?.iconAnimation;
+		// If there is no animation configured, do not start the timer
+		if (!animation || (typeof animation === "string" && animation.trim().length === 0)) {
+			return;
+		}
+		const intervalSec = this.props.config?.settings?.layout?.iconAnimationInterval ?? 5;
+		const intervalMs = Math.max(0, intervalSec) * 1000;
+		if (intervalMs === 0) return;
+		this.iconAnimationIntervalHandle = setInterval(() => {
+			const buttonEl = this.chatToggleButtonRef?.current as HTMLElement | null;
+			if (!buttonEl) return;
+			const container = buttonEl.querySelector(".iconAnimationContainer") as Element | null;
+			if (!container) return;
+			container.classList.remove("optionActive");
+			// Force reflow to restart animation
+			void container.getBoundingClientRect();
+			container.classList.add("optionActive");
+		}, intervalMs);
 	}
 
 	/**
@@ -1172,7 +1219,7 @@ export class WebchatUI extends React.PureComponent<
 													id="webchatWindowToggleButton"
 													disabled
 												>
-													<ChatIcon />
+													<ChatIcon config={config} />
 												</FABDisabled>
 											</div>
 										) : (
@@ -1181,12 +1228,24 @@ export class WebchatUI extends React.PureComponent<
 												onClick={this.handleFabClick}
 												{...webchatToggleProps}
 												type="button"
-												className="webchat-toggle-button"
+												className={classNames(
+													"webchat-toggle-button burst",
+													config.settings?.layout?.iconAnimation,
+												)}
 												id="webchatWindowToggleButton"
 												aria-label={openChatAriaLabel()}
 												ref={this.chatToggleButtonRef}
+												style={
+													{
+														"--icon-burst-duration": `${Math.max(0.2, 1 / Math.max(0.1, config.settings?.layout?.iconAnimationSpeed || 1))}s`,
+													} as React.CSSProperties
+												}
 											>
-												{open ? <CollapseIcon /> : <ChatIcon />}
+												{open ? (
+													<CollapseIcon />
+												) : (
+													<ChatIcon config={config} />
+												)}
 												{config.settings.unreadMessages.enableBadge ? (
 													<Badge
 														_content={unseenMessages.length}
@@ -1634,7 +1693,11 @@ export class WebchatUI extends React.PureComponent<
 		return (
 			<>
 				{enableAIAgentNotice !== false && (
-					<TopStatusMessage variant="body-regular" component="div">
+					<TopStatusMessage
+						variant="body-regular"
+						component="div"
+						className="webchat-log-ai-agent-notice-text"
+					>
 						{AIAgentNoticeText || "You're now chatting with an AI Agent."}
 					</TopStatusMessage>
 				)}
