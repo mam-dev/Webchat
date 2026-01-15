@@ -1727,7 +1727,7 @@ export class WebchatUI extends React.PureComponent<
 						component="div"
 						className="webchat-log-ai-agent-notice-text"
 					>
-						{AIAgentNoticeText || "You're now chatting with an AI Agent."}
+						<div dangerouslySetInnerHTML={{__html: AIAgentNoticeText || "You're now chatting with an AI Agent."}} />
 					</TopStatusMessage>
 				)}
 				{visibleMessages.map((message, index) => {
