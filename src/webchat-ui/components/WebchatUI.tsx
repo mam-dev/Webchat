@@ -1013,6 +1013,23 @@ export class WebchatUI extends React.PureComponent<
 		}
 	};
 
+	/**
+	 * Emits the `webchat/close-button` analytics event.
+	 *
+	 * Fired only from the close ("X") button handlers — the chat window header
+	 * (`handleCloseAndReset`) and the disconnect overlay (`handleClose`). It is
+	 * NOT emitted for the toggle button, the home-screen close (which minimizes),
+	 * or the programmatic `webchat.close()` / `webchat.toggle()` APIs.
+	 *
+	 * This lives in the component rather than the redux analytics middleware
+	 * (where `webchat/open|close|minimize` are emitted) on purpose: the store only
+	 * sees the resulting `SET_OPEN` action and cannot tell which control triggered
+	 * the close, so the originating interaction is only known here.
+	 */
+	emitCloseButtonAnalytics = () => {
+		this.props.onEmitAnalytics("webchat/close-button");
+	};
+
 	render() {
 		const { props, state } = this;
 		const {
@@ -1068,7 +1085,7 @@ export class WebchatUI extends React.PureComponent<
 		const { theme, hadConnection, lastUnseenMessageText, wasOpen, isMobile } = state;
 
 		const {
-			widgetSettings: { disableToggleButton },
+			widgetSettings: { disableToggleButton, disableMobileScrollLock },
 			behavior: { enableConnectionStatusIndicator },
 		} = config.settings;
 
@@ -1161,6 +1178,9 @@ export class WebchatUI extends React.PureComponent<
 
 		const handleClose = () => {
 			onClose();
+			// The disconnect overlay's close ("X") is also a header close button, so
+			// it emits "webchat/close-button" for parity with the chat window header.
+			this.emitCloseButtonAnalytics();
 			this.chatToggleButtonRef.current?.focus();
 		};
 
@@ -1170,7 +1190,10 @@ export class WebchatUI extends React.PureComponent<
 					{/* <Global styles={cssReset} /> */}
 					<>
 						{/* @ts-expect-error - react-remove-scroll typings require `children` even though JSX children are provided correctly */}
-						<RemoveScroll enabled={open && isMobile} allowPinchZoom={true}>
+						<RemoveScroll
+							enabled={open && isMobile && !disableMobileScrollLock}
+							allowPinchZoom={true}
+						>
 							<WebchatWrapper
 								data-cognigy-webchat-root
 								{...restProps}
@@ -1369,6 +1392,10 @@ export class WebchatUI extends React.PureComponent<
 		const handleCloseAndReset = () => {
 			onSetShowHomeScreen(true);
 			onClose();
+			// `onClose()` emits the generic "webchat/close" (which also fires for the
+			// toggle button); this additionally emits "webchat/close-button" so
+			// integrations can react to an explicit header close only.
+			this.emitCloseButtonAnalytics();
 			// Restore focus to chat toggle button
 			this.chatToggleButtonRef?.current?.focus?.();
 		};
