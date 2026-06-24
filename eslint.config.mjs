@@ -22,6 +22,13 @@ export default [
 			"no-empty-function": "off",
 			"@typescript-eslint/no-empty-function": "off",
 			"@typescript-eslint/ban-ts-comment": "off",
+			"@typescript-eslint/no-unused-vars": "warn",
+			"@typescript-eslint/no-explicit-any": "warn",
+			"@typescript-eslint/no-empty-object-type": "warn",
+			"@typescript-eslint/no-require-imports": "warn",
+			"react/display-name": "warn",
+			"no-useless-escape": "warn",
+			"prefer-const": "warn",
 		},
 	},
 ];
