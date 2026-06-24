@@ -3,7 +3,7 @@ import { StoreState } from "../store";
 import { IMessage, IBotMessage, IStreamingMessage } from "../../../common/interfaces/message";
 import { addMessage, addMessageEvent } from "./message-reducer";
 import { Omit } from "react-redux";
-import { setFullscreenMessage, setLastInputId } from "../ui/ui-reducer";
+import { setFullscreenMessage, setLastInputId, setTyping } from "../ui/ui-reducer";
 import { receiveMessage, ReceiveMessageAction } from "./message-handler";
 import { sanitizeHTML } from "../../helper/sanitize";
 import { SocketClient } from "@cognigy/socket-client";
@@ -137,6 +137,10 @@ export const createMessageMiddleware =
 				if (!text && !data) break;
 
 				client.sendMessage(text || "", data);
+
+					if (store.getState().config.settings.behavior.enableTypingIndicator) {
+						next(setTyping("show"));
+					}
 
 				const messageId = generateRandomId();
 
