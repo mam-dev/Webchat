@@ -177,6 +177,7 @@ export interface IWebchatSettings {
 		enableAIAgentNotice: boolean;
 		AIAgentNoticeText: string;
 		enableTypingIndicator: boolean;
+		immediateTypingIndicator?: number;
 		messageDelay: number;
 		inputPlaceholder: string;
 		enableSTT: boolean;

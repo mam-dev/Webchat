@@ -48,6 +48,7 @@ export const getInitialState = (): ConfigState => ({
 			progressiveMessageRendering: false,
 			renderMarkdown: false,
 			enableTypingIndicator: true,
+			immediateTypingIndicator: undefined,
 			messageDelay: 500,
 			inputPlaceholder: "Type something here…",
 			enableSTT: false,

@@ -138,9 +138,14 @@ export const createMessageMiddleware =
 
 				client.sendMessage(text || "", data);
 
-					if (store.getState().config.settings.behavior.enableTypingIndicator) {
-						next(setTyping("show"));
-					}
+				const { immediateTypingIndicator } =
+					store.getState().config.settings.behavior;
+
+				if (typeof immediateTypingIndicator === "number") {
+					setTimeout(() => {
+						store.dispatch(setTyping("show"));
+					}, immediateTypingIndicator);
+				}
 
 				const messageId = generateRandomId();
 
