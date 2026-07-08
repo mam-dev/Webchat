@@ -16,7 +16,7 @@ import baseInputPlugin from "./plugins/input/base";
 import { InputPlugin } from "../../common/interfaces/input-plugin";
 import stylisRTL from "stylis-rtl";
 import { debounce } from "lodash";
-import { RemoveScroll } from "react-remove-scroll";
+import { MobileScrollLock } from "./functional/MobileScrollLock";
 
 import "../utils/normalize.css";
 import { MessageSender } from "../interfaces";
@@ -862,6 +862,25 @@ export class WebchatUI extends React.PureComponent<
 		}
 	};
 
+	/**
+	 * The webchat window (#webchatWindow) is a fixed-size flex shell with `overflow: hidden`; its
+	 * children (header, chat log, input) manage their own scrolling. Safari/WebKit, however, still
+	 * scrolls an `overflow: hidden` ancestor to bring a newly focused element into view — so during
+	 * (reverse) keyboard navigation it nudges the whole window by a few pixels, shifting the header
+	 * up and clipping the layout. Nothing else resets it, so the broken offset sticks (AB#105695).
+	 * Snap the window back to its origin whenever it is scrolled. This is browser- and message-type
+	 * agnostic and never interferes with the inner scroll containers.
+	 */
+	handleWebchatWindowScroll: React.UIEventHandler<HTMLDivElement> = event => {
+		// Only act on the window's own scroll, never on a descendant scroll container that might
+		// surface here. React 18 does not bubble synthetic scroll events, but this keeps the
+		// target-only intent explicit and resilient to any future change in event delegation.
+		if (event.target !== event.currentTarget) return;
+		const el = event.currentTarget;
+		if (el.scrollTop !== 0) el.scrollTop = 0;
+		if (el.scrollLeft !== 0) el.scrollLeft = 0;
+	};
+
 	handleSendRating = ({ rating, comment, showRatingStatus }) => {
 		this.props.onShowRatingScreen(false);
 
@@ -1085,7 +1104,11 @@ export class WebchatUI extends React.PureComponent<
 		const { theme, hadConnection, lastUnseenMessageText, wasOpen, isMobile } = state;
 
 		const {
-			widgetSettings: { disableToggleButton, disableMobileScrollLock },
+			widgetSettings: {
+				disableToggleButton,
+				scrollLockAllowSelectors,
+				disableMobileScrollLock,
+			},
 			behavior: { enableConnectionStatusIndicator },
 		} = config.settings;
 
@@ -1189,10 +1212,9 @@ export class WebchatUI extends React.PureComponent<
 				<ThemeProvider theme={theme}>
 					{/* <Global styles={cssReset} /> */}
 					<>
-						{/* @ts-expect-error - react-remove-scroll typings require `children` even though JSX children are provided correctly */}
-						<RemoveScroll
+						<MobileScrollLock
 							enabled={open && isMobile && !disableMobileScrollLock}
-							allowPinchZoom={true}
+							allowSelectors={scrollLockAllowSelectors}
 						>
 							<WebchatWrapper
 								data-cognigy-webchat-root
@@ -1215,6 +1237,7 @@ export class WebchatUI extends React.PureComponent<
 												className="webchat"
 												id="webchatWindow"
 												ref={this.webchatWindowRef}
+												onScroll={this.handleWebchatWindowScroll}
 												chatWindowWidth={
 													this.props.config.settings.layout
 														.chatWindowWidth
@@ -1311,7 +1334,7 @@ export class WebchatUI extends React.PureComponent<
 									)}
 								</CacheProvider>
 							</WebchatWrapper>
-						</RemoveScroll>
+						</MobileScrollLock>
 					</>
 				</ThemeProvider>
 			</>

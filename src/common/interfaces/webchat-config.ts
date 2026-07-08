@@ -369,6 +369,8 @@ export interface IWebchatSettings {
 			closeFullsizeImageModal?: string;
 			datePickerPreviousMonth?: string;
 			datePickerNextMonth?: string;
+			datePickerGridLabel?: string;
+			datePickerGridDescription?: string;
 			actionButtonPositionText?: string;
 			buttonGroupLabel?: string;
 			slidesCountText?: string;
@@ -436,6 +438,14 @@ export interface IWebchatSettings {
 		disableTextInputSanitization: boolean;
 		disableToggleButton: boolean;
 		disableTeaserMarkdownRemoval: boolean;
+		/**
+		 * CSS selectors for host-page elements that must stay scrollable while the
+		 * webchat holds the mobile scroll lock (open fullscreen on a mobile-sized
+		 * viewport). Use this to keep your own overlays — e.g. a cookie-consent
+		 * banner — usable. Common consent managers (OneTrust, Cookiebot,
+		 * Usercentrics, Didomi) are always allowed; these selectors are added on top.
+		 */
+		scrollLockAllowSelectors: string[];
 		/**
 		 * When the webchat is open on a mobile-sized viewport it locks scrolling of the
 		 * underlying host page (via react-remove-scroll). Set this to `true` to opt out of
