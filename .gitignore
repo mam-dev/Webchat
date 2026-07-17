@@ -8,6 +8,7 @@ dist/index.html
 
 cypress/screenshots
 cypress/videos
+cypress/downloads
 .DS_Store
 
 # Editor directories and files
@@ -18,3 +19,6 @@ cypress/videos
 stats.json
 codeql-db
 codeql-results-dist.sarif
+
+# Superpowers brainstorming/planning docs (local working files, not committed)
+docs/superpowers/

@@ -1035,10 +1035,20 @@ export class WebchatUI extends React.PureComponent<
 	/**
 	 * Emits the `webchat/close-button` analytics event.
 	 *
-	 * Fired only from the close ("X") button handlers — the chat window header
-	 * (`handleCloseAndReset`) and the disconnect overlay (`handleClose`). It is
-	 * NOT emitted for the toggle button, the home-screen close (which minimizes),
-	 * or the programmatic `webchat.close()` / `webchat.toggle()` APIs.
+	 * Fired from every close ("X") button handler — the chat window header
+	 * (`handleCloseAndReset`), the disconnect overlay (`handleClose`) and the home
+	 * screen (`handleHomeScreenClose`). It is NOT emitted for the toggle button,
+	 * the header minimize button, or the programmatic `webchat.close()` /
+	 * `webchat.toggle()` APIs.
+	 *
+	 * The payload carries the connection status at close time so integrations can
+	 * decide whether acting on the close applies: `connected` is the live socket
+	 * state, and `hadConnection` is `true` once a session has connected this visit
+	 * (and stays `true` after it drops — e.g. the disconnect overlay, or a home
+	 * screen returned to after connecting). It is `false` only before the first
+	 * connection (a first-visit home screen, the privacy notice, or the
+	 * previous-conversations screen), so a documented handler keyed on it leaves
+	 * those closes alone.
 	 *
 	 * This lives in the component rather than the redux analytics middleware
 	 * (where `webchat/open|close|minimize` are emitted) on purpose: the store only
@@ -1046,7 +1056,10 @@ export class WebchatUI extends React.PureComponent<
 	 * the close, so the originating interaction is only known here.
 	 */
 	emitCloseButtonAnalytics = () => {
-		this.props.onEmitAnalytics("webchat/close-button");
+		this.props.onEmitAnalytics("webchat/close-button", {
+			connected: this.props.connected,
+			hadConnection: this.state.hadConnection,
+		});
 	};
 
 	render() {
@@ -1423,6 +1436,18 @@ export class WebchatUI extends React.PureComponent<
 			this.chatToggleButtonRef?.current?.focus?.();
 		};
 
+		const handleHomeScreenClose = () => {
+			// The home screen's close ("X") minimizes rather than closing an active
+			// session, but it is still a header close button, so it emits
+			// "webchat/close-button" for parity with the chat window header and the
+			// disconnect overlay. Its payload's `hadConnection` is false on a
+			// first-visit home screen (nothing to act on) but true if the user
+			// already connected and returned here — so a documented handler keyed on
+			// `hadConnection` acts only when a session was actually started.
+			handleOnMinimize();
+			this.emitCloseButtonAnalytics();
+		};
+
 		const handleOnGoBack = () => {
 			if (!showChatOptionsScreen && !showRatingScreen) {
 				onSetShowPrevConversations(false);
@@ -1657,7 +1682,7 @@ export class WebchatUI extends React.PureComponent<
 							onStartConversation={this.handleStartConversation}
 							onLoginAndStartConversation={this.handleLoginAndStartConversation}
 							onSetShowPrevConversations={onSetShowPrevConversations}
-							onClose={handleOnMinimize}
+							onClose={handleHomeScreenClose}
 							config={config}
 							onEmitAnalytics={onEmitAnalytics}
 							onSendActionButtonMessage={this.handleSendActionButtonMessage}

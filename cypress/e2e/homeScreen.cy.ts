@@ -309,7 +309,9 @@ describe("Home Screen", () => {
 		);
 	});
 
-	it("has web url button with correct aria-label when configured", () => {
+	// As of @cognigy/chat-components 0.77.0 (AB#105550), action buttons have no aria-label;
+	// the accessible name is formed from DOM content (title + sr-only new-tab hint).
+	it("has web url button with sr-only new-tab hint when configured", () => {
 		cy.initMockWebchat({
 			settings: {
 				homeScreen: {
@@ -329,11 +331,12 @@ describe("Home Screen", () => {
 			},
 		});
 		cy.openWebchat();
-		cy.get(".webchat-homescreen-button").should(
-			"have.attr",
-			"aria-label",
-			"Web URL starter. Opens in new tab",
-		);
+		// "not.have.attr" must come last: it changes the yielded subject
+		// to the attribute value (undefined), breaking chained assertions.
+		cy.get(".webchat-homescreen-button")
+			.should("contain.text", "Web URL starter")
+			.should("contain.text", "Opens in new tab")
+			.should("not.have.attr", "aria-label");
 	});
 
 	it("has phone number button with tel link when configured", () => {

@@ -63,14 +63,18 @@ describe("Message with Quick Replies", () => {
 		});
 	});
 
-	it("quick reply button should have 'aria-label' attribute with button position and name", () => {
+	// As of @cognigy/chat-components 0.77.0 (AB#105550), action buttons have no aria-label;
+	// the accessible name is formed from DOM content (sr-only position text + button title).
+	it("quick reply button should have sr-only position text and no aria-label", () => {
 		cy.withMessageFixture("quick-replies", () => {
-			cy.contains("foobar003qr01")
-				.invoke("attr", "aria-label")
-				.should("contain", "1 of 2: foobar003qr01");
-			cy.contains("foobar003qr02")
-				.invoke("attr", "aria-label")
-				.should("contain", "2 of 2: foobar003qr02");
+			// "not.have.attr" must come last: it changes the yielded subject
+			// to the attribute value (undefined), breaking chained assertions.
+			cy.contains(".webchat-quick-reply-template-button", "foobar003qr01")
+				.should("contain.text", "1 of 2: foobar003qr01")
+				.should("not.have.attr", "aria-label");
+			cy.contains(".webchat-quick-reply-template-button", "foobar003qr02")
+				.should("contain.text", "2 of 2: foobar003qr02")
+				.should("not.have.attr", "aria-label");
 		});
 	});
 });
