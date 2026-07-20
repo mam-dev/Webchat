@@ -39,6 +39,9 @@ const TextArea = styled(TextareaAutosize)(({ theme }) => ({
 	outline: "none",
 	resize: "none",
 	backgroundColor: "transparent",
+	// Safari/WebKit hides the text caret when the background is transparent,
+	// so set an explicit caret color to keep the cursor visible.
+	caretColor: theme.textDark,
 	overscrollBehavior: "contain",
 
 	fontSize: "0.875rem", // 14px
@@ -251,11 +254,36 @@ export class BaseInput extends React.PureComponent<IBaseInputProps, IBaseInputSt
 			this.setState({ text });
 		};
 		setTimeout(() => {
-			if (!this.props.config.settings.widgetSettings.disableInputAutofocus) {
-				this.inputRef.current?.focus?.();
-			}
+			if (this.props.config.settings.widgetSettings.disableInputAutofocus) return;
+			const input = this.inputRef.current;
+			input?.focus?.();
+			this.fixSafariCaret(input);
 		}, 200);
 	}
+
+	/**
+	 * Safari/WebKit does not paint the text caret in a pristine (never edited)
+	 * field, even when it is focused — the caret only appears after the first
+	 * real keystroke. Simulate a no-op edit (insert then delete a space) to flip
+	 * WebKit's internal "has been edited" state so the caret renders on initial
+	 * load. The edit routes through the textarea so its value stays empty.
+	 * Guarded to WebKit/Safari and to an empty field to avoid side effects
+	 * elsewhere.
+	 */
+	fixSafariCaret = (input: HTMLTextAreaElement | HTMLInputElement | null): void => {
+		if (!input || input.value) return;
+
+		const isWebkit = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+		if (!isWebkit) return;
+
+		input.focus();
+		try {
+			document.execCommand("insertText", false, " ");
+			document.execCommand("delete", false);
+		} catch {
+			/* execCommand may be unavailable; the caret fix is best-effort */
+		}
+	};
 
 	componentDidUpdate() {
 		const sttLanguage = this.props.config.settings.widgetSettings.STTLanguage;
@@ -403,7 +431,11 @@ export class BaseInput extends React.PureComponent<IBaseInputProps, IBaseInputSt
 					collate: true,
 				});
 
-				if (this.inputRef.current) this.inputRef.current.focus();
+				const input = this.inputRef.current;
+				input?.focus();
+				// Sending clears the field, which returns it to WebKit's
+				// pristine state and drops the caret again — re-apply the fix.
+				this.fixSafariCaret(input);
 			},
 		);
 	};
