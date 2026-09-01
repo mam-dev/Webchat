@@ -97,7 +97,6 @@ export const getInitialState = (): ConfigState => ({
 				enabled: true,
 				buttonText: "Previous conversations",
 				title: "",
-				startNewConversationButtonText: ""
 			},
 			conversationStarters: {
 				enabled: true,
