@@ -13,8 +13,9 @@ import { IWebchatButton } from "@cognigy/socket-client";
 import CognigyAIAvatar from "../../assets/cognigy-ai-avatar-28px.svg";
 import { Logo } from "./Header";
 import getKeyboardFocusableElements from "../../utils/find-focusable";
+import { InertProps } from "../../utils/inert-props";
 
-const HomeScreenRoot = styled.div(({ theme }) => ({
+const HomeScreenRoot = styled.div<InertProps>(({ theme }) => ({
 	display: "flex",
 	position: "absolute",
 	top: 0,
@@ -194,27 +195,40 @@ export const HomeScreen: React.FC<IHomeScreenProps> = props => {
 	useEffect(() => {
 		if (homeScreenRef.current) {
 			const { firstFocusable } = getKeyboardFocusableElements(homeScreenRef.current);
-			firstFocusable.focus();
+			firstFocusable?.focus();
 		}
 	}, []);
 
-	// Get all focusable elemnents inside homeScreen root and set tabindex to -1, if the homescreen is visually hidden
+	// Fallback for browsers without `inert` support (CGY-3278): toggle tabindex
+	// on all interactive elements while the home screen is visually hidden.
+	// Uses focusableIgnoringInert because the plain `focusable` list skips
+	// [inert] subtrees — which the hidden home screen root is.
 	useEffect(() => {
 		const tabIndex = showHomeScreen ? 0 : -1;
 
 		if (homeScreenRef.current) {
-			const { focusable } = getKeyboardFocusableElements(homeScreenRef.current);
+			const { focusableIgnoringInert } = getKeyboardFocusableElements(homeScreenRef.current);
 
-			focusable.forEach((el: Element) => {
+			focusableIgnoringInert.forEach((el: Element) => {
 				el.setAttribute("tabindex", tabIndex.toString());
 			});
 		}
 	}, [showHomeScreen]);
 
 	return (
+		// While another screen (privacy notice, previous conversations, chat,
+		// chat options) is active, the home screen stays mounted behind it for
+		// the exit/enter transition. `inert` removes it from the accessibility
+		// tree, tab order and pointer events — aria-hidden alone still let NVDA
+		// arrow-key browsing reach the content (CGY-3278, WCAG 1.3.2).
+		// aria-hidden="true" stays as a fallback for browsers without inert
+		// support. While visible, neither attribute is rendered:
+		// aria-hidden="false" has inconsistent AT support and reads as hidden
+		// to attribute-presence checks.
 		<HomeScreenRoot
 			className="webchat-homescreen-root"
-			aria-hidden={!showHomeScreen}
+			aria-hidden={showHomeScreen ? undefined : true}
+			inert={showHomeScreen ? undefined : ""}
 			ref={homeScreenRef}
 		>
 			<h2 className="sr-only">

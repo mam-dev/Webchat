@@ -30,6 +30,7 @@ import { TTyping } from "../../common/interfaces/typing";
 import Badge from "./presentational/Badge";
 import getTextFromMessage from "../../webchat/helper/message";
 import getKeyboardFocusableElements from "../utils/find-focusable";
+import { InertProps } from "../utils/inert-props";
 import notificationSound from "../utils/notification-sound";
 import { findReverse } from "../utils/find-reverse";
 import "../../assets/style.css";
@@ -74,6 +75,17 @@ import { isMobileViewport } from "../utils/isMobile";
 import { removeMarkdownChars } from "../../webchat/helper/handleMarkdown";
 import DeleteAllConversationsModal from "./presentational/previous-conversations/DeleteAllConversations";
 import ScreenReaderLiveRegion from "./presentational/ScreenReaderLiveRegion";
+import { StatusLiveRegion } from "./presentational/StatusLiveRegion";
+import FreezeOnExit from "./presentational/FreezeOnExit";
+import HomeScreenAnnouncer from "./presentational/HomeScreenAnnouncer";
+import {
+	computeNoticeSession,
+	getAIAgentNoticeIntroText,
+	INITIAL_NOTICE_SESSION,
+	NoticeSession,
+	DEFAULT_AI_AGENT_NOTICE_TEXT,
+} from "../utils/ai-agent-notice";
+import { getScreenVisibility } from "../utils/screen-visibility";
 import classNames from "classnames";
 import { LoginHandler } from "../../common/interfaces/login-handler";
 
@@ -109,6 +121,7 @@ export interface WebchatUIProps {
 	webchatToggleProps?: React.ComponentProps<typeof FAB>;
 
 	connected: boolean;
+	connecting: boolean;
 	reconnectionLimit: boolean;
 
 	hasGivenRating: boolean;
@@ -137,6 +150,8 @@ export interface WebchatUIProps {
 	showPrevConversations: boolean;
 	onSetShowPrevConversations: (show: boolean) => void;
 	prevConversations: PrevConversationsState;
+	/** True once a non-empty persisted history was restored (page reload of a stored conversation) — see MessageState. */
+	hasRestoredPersistedHistory?: boolean;
 	onSwitchSession: (sessionId?: string, conversation?: PrevConversationsState[string]) => void;
 
 	showChatOptionsScreen: boolean;
@@ -169,6 +184,8 @@ interface WebchatUIState {
 	deleteConversationsModalState: boolean;
 	liveContent?: Record<string, string>;
 	isMobile: boolean;
+	/** Gates the AI-agent notice announcement (CGY-3519) — see NoticeSession. */
+	noticeSession: NoticeSession;
 }
 
 const stylisPlugins = [isolate("[data-cognigy-webchat-root]")];
@@ -212,7 +229,17 @@ const RegularLayoutRoot = styled.div({
 	overscrollBehavior: "contain",
 });
 
-const RegularLayoutContentWrapper = styled.div(({ theme }) => ({
+// Wraps the chat layout so it can be hidden from assistive technologies and
+// removed from the tab order (aria-hidden + inert) while the disconnect
+// overlay is open — the overlay must be the only perceivable/operable content.
+const DisconnectableContentWrapper = styled.div({
+	height: "100%",
+	display: "flex",
+	flexDirection: "column",
+	minHeight: 0,
+});
+
+const RegularLayoutContentWrapper = styled.div<InertProps>(({ theme }) => ({
 	height: "100%",
 	zIndex: 3,
 	display: "flex",
@@ -268,6 +295,7 @@ export class WebchatUI extends React.PureComponent<
 		deleteConversationsModalState: false,
 		liveContent: {},
 		isMobile: false,
+		noticeSession: INITIAL_NOTICE_SESSION,
 	};
 
 	chatToggleButtonRef: React.RefObject<HTMLButtonElement>;
@@ -287,6 +315,27 @@ export class WebchatUI extends React.PureComponent<
 	private visibilityCheckCompleted = false;
 
 	private engagementMessageTimeout: ReturnType<typeof setTimeout> | null = null;
+	private ratingFocusTimeout: ReturnType<typeof setTimeout> | null = null;
+	private homeScreenExitFocusTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	// Disarms the pending home-screen exit focus fallback. Also registered as
+	// a capture-phase document pointerdown listener while the fallback is
+	// armed, so a deliberate click/tap during the 450ms window cancels it.
+	private cancelHomeScreenExitFocusFallback = () => {
+		if (this.homeScreenExitFocusTimeout) {
+			clearTimeout(this.homeScreenExitFocusTimeout);
+			this.homeScreenExitFocusTimeout = null;
+		}
+		document.removeEventListener("pointerdown", this.cancelHomeScreenExitFocusFallback, true);
+	};
+
+	/**
+	 * Announce keys of conversations whose AI-agent notice was already
+	 * announced (CGY-3519). Lives on the instance (not in the live region):
+	 * ScreenReaderLiveRegion unmounts on every screen navigation, so it
+	 * cannot remember what it announced across visits to the chat screen.
+	 */
+	private announcedNoticeKeys = new Set<string>();
 
 	constructor(props) {
 		super(props);
@@ -505,6 +554,39 @@ export class WebchatUI extends React.PureComponent<
 			false;
 	};
 
+	// `prevConversationsSnapshot` must predate the session change — see
+	// computeNoticeSession for why. `hasRestoredPersistedHistory` is read
+	// from CURRENT props on purpose: the restore lands in the same commit
+	// as the session id it belongs to.
+	private evaluateNoticeSession(prevConversationsSnapshot: PrevConversationsState) {
+		const id = this.props.currentSession || "";
+		this.setState(prev => ({
+			noticeSession: computeNoticeSession(
+				prev.noticeSession,
+				id,
+				prevConversationsSnapshot,
+				this.props.hasRestoredPersistedHistory,
+			),
+		}));
+	}
+
+	private handleNoticeIntroAnnounced = (introKey: string) => {
+		this.announcedNoticeKeys.add(introKey);
+	};
+
+	private getNoticeIntro(): { key: string; text: string } | undefined {
+		const text = getAIAgentNoticeIntroText({
+			behavior: this.props.config.settings.behavior,
+			showDisconnectOverlay: this.showDisconnectOverlay,
+			noticeSession: this.state.noticeSession,
+			currentSessionId: this.props.currentSession || "",
+			announcedKeys: this.announcedNoticeKeys,
+		});
+		if (!text) return undefined;
+
+		return { key: this.state.noticeSession.announceKey, text };
+	}
+
 	componentDidMount() {
 		const defaultMessagePlugins: MessagePlugin[] = [];
 		if (this.props.ttsActive) {
@@ -517,10 +599,34 @@ export class WebchatUI extends React.PureComponent<
 		});
 		this.setupIconAnimationInterval();
 
+		// No pre-change snapshot exists on mount; the current map predates
+		// any message activity of this page load.
+		this.evaluateNoticeSession(this.props.prevConversations);
+
 		window.addEventListener("resize", this.handleResize);
 	}
 
-	async componentDidUpdate(prevProps: WebchatUIProps, prevState: WebchatUIState) {
+	// Hiding the home screen applies `inert` to its root, which blurs any
+	// focused descendant. This hook runs just before that DOM update — the
+	// last moment to see whether focus is inside the home screen (user is
+	// leaving it) or elsewhere (programmatic exit). componentDidUpdate arms
+	// the exit-focus fallback only in the first case, so a programmatic exit
+	// never has focus stolen.
+	getSnapshotBeforeUpdate(prevProps: WebchatUIProps): boolean | null {
+		if (prevProps.showHomeScreen && !this.props.showHomeScreen) {
+			const homeScreenRoot = this.webchatWindowRef?.current?.querySelector(
+				".webchat-homescreen-root",
+			);
+			return !!homeScreenRoot?.contains(document.activeElement);
+		}
+		return null;
+	}
+
+	async componentDidUpdate(
+		prevProps: WebchatUIProps,
+		prevState: WebchatUIState,
+		focusWasInsideHomeScreen?: boolean | null,
+	) {
 		// When the webchat is opened, focus is moved to the first focusable element inside the webchat window.
 		// This happens only if the currently focused element is the toggle button, ensuring no interruption to other interactions or auto-focus behavior.
 		// This prevents focus loss when no element with auto-focus is found inside the webchat window.
@@ -532,6 +638,50 @@ export class WebchatUI extends React.PureComponent<
 			if (document.activeElement === webchatToggleButton && firstFocusable) {
 				firstFocusable.focus();
 			}
+		}
+
+		// Leaving the home screen: `inert` on its root blurs the control that
+		// triggered the exit (e.g. the just-clicked Start conversation button),
+		// so focus can drop to document.body and Tab would restart at the top
+		// of the host page (SC 2.4.3). Most exits re-focus on their own — the
+		// privacy notice / previous conversations / chat options via
+		// autoFocusScreenTitle, the chat screen via the message input's
+		// autofocus — so this fallback checks late (450ms, after BaseInput's
+		// 200ms autofocus and the Header's 200ms title focus, matching the
+		// back-to-home timing) and only acts if focus is still on document.body
+		// or stuck inside the hidden home screen. That is the case when
+		// entering the chat screen with `disableInputAutofocus: true`.
+		// It is armed only when the exit blurred focus out of the home screen
+		// (the getSnapshotBeforeUpdate result), and a pointerdown anywhere
+		// during the window disarms it — so a programmatic exit or a deliberate
+		// click (e.g. on a non-focusable area of the host page) never has focus
+		// pulled away.
+		if (prevProps.showHomeScreen && !this.props.showHomeScreen && focusWasInsideHomeScreen) {
+			this.cancelHomeScreenExitFocusFallback();
+			document.addEventListener("pointerdown", this.cancelHomeScreenExitFocusFallback, true);
+			this.homeScreenExitFocusTimeout = setTimeout(() => {
+				this.cancelHomeScreenExitFocusFallback();
+				const webchatWindowEl = this.webchatWindowRef?.current;
+				if (!webchatWindowEl) return;
+
+				const active = document.activeElement;
+				const homeScreenRoot = webchatWindowEl.querySelector(".webchat-homescreen-root");
+				if (active === document.body || homeScreenRoot?.contains(active)) {
+					// Scoped to the header bar because id "webchatHeaderTitle" is
+					// duplicated across Header, HomeScreen and TeaserMessage. The
+					// Header is not rendered while the xApp overlay is open, so
+					// fall back to the window's first focusable element.
+					(
+						webchatWindowEl.querySelector<HTMLElement>(
+							".webchat-header-bar .webchat-header-title",
+						) ?? getKeyboardFocusableElements(webchatWindowEl).firstFocusable
+					)?.focus();
+				}
+			}, 450);
+		}
+
+		if (prevProps.currentSession !== this.props.currentSession) {
+			this.evaluateNoticeSession(prevProps.prevConversations);
 		}
 
 		if (
@@ -688,6 +838,14 @@ export class WebchatUI extends React.PureComponent<
 			this.engagementMessageTimeout = null;
 		}
 
+		if (this.ratingFocusTimeout) {
+			clearTimeout(this.ratingFocusTimeout);
+			this.ratingFocusTimeout = null;
+		}
+
+		// also removes the fallback's document pointerdown listener
+		this.cancelHomeScreenExitFocusFallback();
+
 		// Teardown icon animation interval
 		if (this.iconAnimationIntervalHandle) {
 			clearInterval(this.iconAnimationIntervalHandle);
@@ -816,6 +974,16 @@ export class WebchatUI extends React.PureComponent<
 		);
 	};
 
+	// Whether the blocking connection-lost overlay is shown. Single source for
+	// render and the focus trap in handleKeydown — the two must stay in sync.
+	private get showDisconnectOverlay() {
+		return (
+			this.props.config.settings.behavior.enableConnectionStatusIndicator &&
+			!this.props.connected &&
+			this.state.hadConnection
+		);
+	}
+
 	// Key down handler
 	handleKeydown = event => {
 		const { enableFocusTrap } = this.props.config.settings.widgetSettings;
@@ -830,7 +998,12 @@ export class WebchatUI extends React.PureComponent<
 			open &&
 			// Do not trap focus when the delete conversations related modal is open
 			!showDeleteAllConversationsModal &&
-			!deleteConversationsModalState
+			!deleteConversationsModalState &&
+			// The disconnect overlay (a Modal) runs its own focus trap; the layout
+			// behind it is inert, so this trap would agree with it only by virtue
+			// of getKeyboardFocusableElements skipping inert subtrees. Excluded
+			// explicitly instead of relying on that coupling.
+			!this.showDisconnectOverlay
 		) {
 			// Get the first and last focusable elements within the webchat window and add focus
 			const webchatWindowEl = this.webchatWindowRef?.current as HTMLElement;
@@ -882,6 +1055,8 @@ export class WebchatUI extends React.PureComponent<
 	};
 
 	handleSendRating = ({ rating, comment, showRatingStatus }) => {
+		const wasRatingScreen = this.props.showRatingScreen;
+
 		this.props.onShowRatingScreen(false);
 
 		this.props.onSendMessage(
@@ -904,6 +1079,24 @@ export class WebchatUI extends React.PureComponent<
 		);
 
 		this.props.onSetHasGivenRating();
+
+		// Submitting from the chat options screen removes the focused Send
+		// button (rating "once" unmounts the widget; "always" disables it),
+		// which would drop focus to document.body (SC 2.4.3 Focus Order).
+		// Move focus to the screen title instead, mirroring the
+		// autoFocusScreenTitle pattern in Header. The request-rating screen
+		// path is excluded: it closes the screen and the message input
+		// takes focus on mount.
+		// Scoped to the header bar because id "webchatHeaderTitle" is
+		// duplicated across Header, HomeScreen and TeaserMessage.
+		if (!wasRatingScreen) {
+			if (this.ratingFocusTimeout) clearTimeout(this.ratingFocusTimeout);
+			this.ratingFocusTimeout = setTimeout(() => {
+				this.webchatWindowRef?.current
+					?.querySelector<HTMLElement>(".webchat-header-bar .webchat-header-title")
+					?.focus();
+			}, 200);
+		}
 	};
 
 	handleSendActionButtonMessage = (
@@ -978,18 +1171,22 @@ export class WebchatUI extends React.PureComponent<
 	};
 
 	handleLoginAndStartConversation = () => {
-		const payload = this.props.config.settings.homeScreen.loginAndStartConversationButton.payload;
+		const payload =
+			this.props.config.settings.homeScreen.loginAndStartConversationButton.payload;
 		const userId = this.props.options?.userId || "";
 		const sessionId = this.props.currentSession;
 		if (payload && payload !== "") {
-			if (this.props.config.settings.homeScreen.loginAndStartConversationButton.type && 
-				this.props.config.settings.homeScreen.loginAndStartConversationButton.type === "handler") {
+			if (
+				this.props.config.settings.homeScreen.loginAndStartConversationButton.type &&
+				this.props.config.settings.homeScreen.loginAndStartConversationButton.type ===
+					"handler"
+			) {
 				// type = handler
 				try {
 					const handlerFunction = payload as LoginHandler;
-					if (typeof handlerFunction === 'function') {
+					if (typeof handlerFunction === "function") {
 						handlerFunction(userId, sessionId);
-					} 
+					}
 				} catch (error) {
 					console.error(`Error calling handler function '${payload}':`, error);
 				}
@@ -997,8 +1194,8 @@ export class WebchatUI extends React.PureComponent<
 				// type = url
 				if (payload) {
 					const url = new URL(payload as string, window.location.origin);
-					url.searchParams.append('userId', userId);
-					url.searchParams.append('sessionId', sessionId);
+					url.searchParams.append("userId", userId);
+					url.searchParams.append("sessionId", sessionId);
 					window.location.href = url.toString();
 				}
 			}
@@ -1122,7 +1319,6 @@ export class WebchatUI extends React.PureComponent<
 				scrollLockAllowSelectors,
 				disableMobileScrollLock,
 			},
-			behavior: { enableConnectionStatusIndicator },
 		} = config.settings;
 
 		if (
@@ -1151,8 +1347,11 @@ export class WebchatUI extends React.PureComponent<
 				isInformingOutOfBusinessHours(config.settings.businessHours) ||
 				isInformingDueToConnectivity(config.settings, state.timedOut));
 
-		const showDisconnectOverlay =
-			enableConnectionStatusIndicator && !connected && hadConnection;
+		const showDisconnectOverlay = this.showDisconnectOverlay;
+
+		// Drives the home-screen announcer below; the announcer mounts only
+		// while the webchat is open, so no `open` check is needed here.
+		const { showHomeScreenView } = getScreenVisibility(this.props, isInforming);
 
 		const openChatAriaLabel = () => {
 			if (open)
@@ -1256,13 +1455,43 @@ export class WebchatUI extends React.PureComponent<
 														.chatWindowWidth
 												}
 											>
-												{!fullscreenMessage
-													? this.renderRegularLayout(isInforming)
-													: this.renderFullscreenMessageLayout()}
+												<DisconnectableContentWrapper
+													aria-hidden={showDisconnectOverlay || undefined}
+													// React 18 has no `inert` prop; the inline
+													// ref callback runs on every render, keeping
+													// the attribute in sync with the overlay.
+													ref={el => {
+														if (!el) return;
+														if (showDisconnectOverlay) {
+															el.setAttribute("inert", "");
+														} else {
+															el.removeAttribute("inert");
+														}
+													}}
+												>
+													{!fullscreenMessage
+														? this.renderRegularLayout(isInforming)
+														: this.renderFullscreenMessageLayout()}
+												</DisconnectableContentWrapper>
+												{/* Outside the inert wrapper: the region must stay
+												    in the a11y tree while the disconnect overlay is
+												    open — hiding it and re-exposing it with content
+												    already inside would swallow announcements. */}
+												<StatusLiveRegion />
+												{/* Announce the home screen when it becomes the visible view (WCAG 4.1.3) */}
+												<HomeScreenAnnouncer
+													active={showHomeScreenView}
+													label={
+														config.settings.customTranslations
+															?.ariaLabels?.homeScreen ??
+														"Chat window home screen"
+													}
+												/>
 												<DisconnectOverlay
 													isOpen={showDisconnectOverlay}
 													onConnect={onConnect}
 													isPermanent={!!reconnectionLimit}
+													isConnecting={!!this.props.connecting}
 													onClose={handleClose}
 													config={config}
 												/>
@@ -1552,8 +1781,6 @@ export class WebchatUI extends React.PureComponent<
 					/>
 				);
 
-			// ReactModal.setAppElement moved to componentDidMount to avoid repeated invocations.
-
 			return (
 				<>
 					<HistoryWrapper
@@ -1569,7 +1796,11 @@ export class WebchatUI extends React.PureComponent<
 						</h3>
 						{this.renderHistory()}
 					</HistoryWrapper>
-					<ScreenReaderLiveRegion liveContent={this.state.liveContent} />
+					<ScreenReaderLiveRegion
+						liveContent={this.state.liveContent}
+						intro={this.getNoticeIntro()}
+						onIntroAnnounced={this.handleNoticeIntroAnnounced}
+					/>
 					<QueueUpdates />
 					{this.renderInput()}
 				</>
@@ -1602,15 +1833,10 @@ export class WebchatUI extends React.PureComponent<
 		};
 
 		const isHomeScreenEnabled = config.settings.homeScreen.enabled;
-		const showEnabledHomeScreen = isHomeScreenEnabled && showHomeScreen;
-
-		const showChatScreen =
-			!showChatOptionsScreen &&
-			!showRatingScreen &&
-			!showPrevConversations &&
-			!showEnabledHomeScreen &&
-			!showInformationMessage &&
-			(hasAcceptedTerms || !config.settings.privacyNotice.enabled);
+		const { showEnabledHomeScreen, showChatScreen } = getScreenVisibility(
+			this.props,
+			isInforming,
+		);
 
 		const isChatOptionsButtonVisible = config.settings.chatOptions.enabled && showChatScreen;
 
@@ -1626,11 +1852,24 @@ export class WebchatUI extends React.PureComponent<
 
 		const autoFocusScreenTitle = !showChatScreen && !showHomeScreen;
 
+		// True while the regular layout is the active view. During the back-to-home
+		// slide-out it stays mounted for the 500ms exit animation; the content wrapper
+		// below then gets `inert` (removes it from tab order and pointer events —
+		// aria-hidden alone leaves the off-screen controls tabbable) plus
+		// aria-hidden="true" as a fallback for browsers without inert support
+		// (WCAG 1.3.2), so screen readers don't announce the leaving screen's
+		// messages and input label. While active, neither attribute is rendered:
+		// aria-hidden="false" has inconsistent AT support and would read as hidden
+		// to attribute-presence checks. The header transition is deliberately not
+		// hidden: it is static chrome with no live region, so nothing in it
+		// announces during the exit.
+		const isRegularLayoutActiveView = !!(!showEnabledHomeScreen || showInformationMessage);
+
 		return (
 			<RegularLayoutRoot>
 				{!isXAppOverlayOpen && (
 					<CSSTransition
-						in={!!(!showEnabledHomeScreen || showInformationMessage)}
+						in={isRegularLayoutActiveView}
 						timeout={500}
 						classNames="slide-in"
 						mountOnEnter
@@ -1691,14 +1930,22 @@ export class WebchatUI extends React.PureComponent<
 				)}
 				{
 					<CSSTransition
-						in={!!(!showEnabledHomeScreen || showInformationMessage)}
+						in={isRegularLayoutActiveView}
 						timeout={500}
 						classNames="slide-in"
 						mountOnEnter
 						unmountOnExit
 					>
-						<RegularLayoutContentWrapper>
-							{getRegularLayoutContent()}
+						<RegularLayoutContentWrapper
+							className="webchat-regular-layout-content"
+							aria-hidden={isRegularLayoutActiveView ? undefined : true}
+							inert={isRegularLayoutActiveView ? undefined : ""}
+						>
+							{/* Keep the leaving view frozen during its exit animation
+							    instead of already rendering the chat screen (CGY-3276). */}
+							<FreezeOnExit active={isRegularLayoutActiveView}>
+								{getRegularLayoutContent()}
+							</FreezeOnExit>
 							<DeleteAllConversationsModal
 								config={config}
 								isOpen={this.state.showDeleteAllConversationsModal}
@@ -1802,7 +2049,11 @@ export class WebchatUI extends React.PureComponent<
 						component="div"
 						className="webchat-log-ai-agent-notice-text"
 					>
-						<div dangerouslySetInnerHTML={{__html: AIAgentNoticeText || "You're now chatting with an AI Agent."}} />
+						<div
+							dangerouslySetInnerHTML={{
+								__html: AIAgentNoticeText || DEFAULT_AI_AGENT_NOTICE_TEXT,
+							}}
+						/>
 					</TopStatusMessage>
 				)}
 				{visibleMessages.map((message, index) => {

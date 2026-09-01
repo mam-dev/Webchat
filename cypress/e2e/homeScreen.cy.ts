@@ -398,5 +398,98 @@ describe("Home Screen", () => {
 			cy.get("button").contains("Postback starter");
 			cy.checkA11yCompliance("[data-cognigy-webchat-root]");
 		});
+
+		// CGY-3278 (WCAG 1.3.2): while another screen is active, the home screen
+		// stays mounted behind it for the transition. aria-hidden alone still let
+		// NVDA arrow-key browsing reach its content, so the root must also carry
+		// `inert` to leave the accessibility tree entirely.
+		it("removes the home screen from the accessibility tree while another screen is active (CGY-3278)", () => {
+			cy.initMockWebchat({
+				settings: {
+					homeScreen: {
+						enabled: true,
+						previousConversations: { enabled: true },
+					},
+				},
+			});
+			cy.openWebchat();
+			cy.get("button").contains("Previous conversations").click();
+			// separate assertions: chained attribute assertions can re-subject
+			cy.get(".webchat-homescreen-root").should("have.attr", "aria-hidden", "true");
+			cy.get(".webchat-homescreen-root").should("have.attr", "inert");
+			// tabindex fallback for browsers without inert support
+			cy.get(".webchat-homescreen-root button").each($el => {
+				cy.wrap($el).should("have.attr", "tabindex", "-1");
+			});
+		});
+
+		it("exposes the home screen to assistive tech again when navigating back to it (CGY-3278)", () => {
+			cy.initMockWebchat({
+				settings: {
+					homeScreen: {
+						enabled: true,
+						previousConversations: { enabled: true },
+					},
+				},
+			});
+			cy.openWebchat();
+			cy.get("button").contains("Previous conversations").click();
+			cy.get(".webchat-homescreen-root").should("have.attr", "inert");
+			cy.get("button.webchat-header-back-button").click();
+			cy.get(".webchat-homescreen-root button").each($el => {
+				cy.wrap($el).should("have.attr", "tabindex", "0");
+			});
+			// not.have.attr re-subjects the chain — keep these assertions last
+			cy.get(".webchat-homescreen-root").should("not.have.attr", "inert");
+			cy.get(".webchat-homescreen-root").should("not.have.attr", "aria-hidden");
+		});
+
+		// SC 2.4.3: `inert` on the hiding home screen blurs the just-activated
+		// Start conversation button. With the input's autofocus disabled nothing
+		// else picks focus up, so WebchatUI moves it to the header title.
+		it("moves focus to the header title when starting a conversation with input autofocus disabled (CGY-3278)", () => {
+			cy.initMockWebchat({
+				settings: {
+					homeScreen: { enabled: true },
+					widgetSettings: { disableInputAutofocus: true },
+				},
+			});
+			cy.openWebchat();
+			cy.get("[data-test='webchat-start-chat-button']").click();
+			cy.get(".webchat-input-message-input").should("be.visible");
+			// the fallback fires 450ms after the home screen hides
+			cy.focused().should("have.class", "webchat-header-title");
+		});
+
+		// Reopening onto the chat screen mounts the home screen already hidden.
+		// Its mount effect must not focus the hidden close button — the inert
+		// root keeps it out of getKeyboardFocusableElements' `focusable` list —
+		// so the on-open logic focuses the first focusable in the window instead.
+		it("does not move focus into the hidden home screen when reopening onto the chat screen (CGY-3278)", () => {
+			cy.initMockWebchat({
+				settings: {
+					homeScreen: { enabled: true },
+					widgetSettings: { disableInputAutofocus: true },
+				},
+			});
+			cy.openWebchat();
+			cy.get("[data-test='webchat-start-chat-button']").click();
+			cy.get(".webchat-input-message-input").should("be.visible");
+
+			// minimize, then reopen via the toggle so the on-open focus logic runs
+			cy.get("[data-cognigy-webchat-toggle]").click();
+			cy.get(".webchat-input-message-input").should("not.exist");
+			cy.get("[data-cognigy-webchat-toggle]").click();
+			cy.get(".webchat-input-message-input").should("be.visible");
+
+			// allow any late (200ms/450ms) focus timers to fire before asserting.
+			// Assert the positive target (the window's first focusable — the
+			// header back button) rather than "not inside the home screen":
+			// cy.focused() yields null when focus is lost to <body>, which would
+			// fail a .closest() chain with a confusing error instead of a clean
+			// assertion.
+			cy.wait(600);
+			cy.focused().should("have.class", "webchat-header-back-button");
+		});
 	});
 });

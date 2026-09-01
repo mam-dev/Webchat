@@ -36,12 +36,14 @@ type FromState = Pick<
 	| "messages"
 	| "unseenMessages"
 	| "prevConversations"
+	| "hasRestoredPersistedHistory"
 	| "open"
 	| "typingIndicator"
 	| "inputMode"
 	| "fullscreenMessage"
 	| "config"
 	| "connected"
+	| "connecting"
 	| "reconnectionLimit"
 >;
 
@@ -67,10 +69,14 @@ type Merge = FromState & FromDispatch & FromProps & Pick<WebchatUIProps, "fullsc
 export const ConnectedWebchatUI = connect<FromState, FromDispatch, FromProps, Merge, StoreState>(
 	(state: StoreState) => {
 		const {
-			messages: { messageHistory: messages, visibleOutputMessages },
+			messages: {
+				messageHistory: messages,
+				visibleOutputMessages,
+				hasRestoredPersistedHistory,
+			},
 			unseenMessages,
 			prevConversations,
-			connection: { connected, reconnectionLimit },
+			connection: { connected, connecting, reconnectionLimit },
 			ui: {
 				open,
 				typing,
@@ -105,12 +111,14 @@ export const ConnectedWebchatUI = connect<FromState, FromDispatch, FromProps, Me
 			visibleOutputMessages,
 			unseenMessages,
 			prevConversations,
+			hasRestoredPersistedHistory,
 			open,
 			typingIndicator: typing,
 			inputMode,
 			fullscreenMessage,
 			config,
 			connected,
+			connecting,
 			reconnectionLimit,
 			showRatingScreen,
 			hasGivenRating,
