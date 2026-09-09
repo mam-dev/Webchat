@@ -331,6 +331,14 @@ export interface IWebchatSettings {
 		cancel: string;
 		datePickerMonthLabel?: string;
 		datePickerYearLabel?: string;
+		/** Shown when the microphone is blocked for the page (SC 3.3.1). */
+		speech_recognition_not_allowed?: string;
+		/** Shown when no capture device is available. */
+		speech_recognition_no_microphone?: string;
+		/** Shown when a dictation produced no transcript at all. */
+		speech_recognition_no_speech?: string;
+		/** Shown for any other speech-recognition failure. */
+		speech_recognition_error?: string;
 		ariaLabels?: {
 			chatRegion?: string;
 			scrollToBottom?: string;
@@ -358,6 +366,7 @@ export interface IWebchatSettings {
 			homeScreen?: string;
 			newMessagePreview?: string;
 			opensInNewTab?: string;
+			typingIndicator?: string;
 			// The following is used by chat components
 			audioPlaybackProgress?: string;
 			pauseAudio?: string;
