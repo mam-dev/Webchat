@@ -64,6 +64,38 @@ describe("Focus management (WCAG 2.2 AA)", () => {
 			cy.focused().should("have.id", "webchatWindowToggleButton");
 		});
 
+		it("closes on Escape and returns focus to the toggle button", () => {
+			cy.initMockWebchat({ settings: { homeScreen: { enabled: false } } });
+			cy.openWebchat().startConversation();
+			cy.get("#webchatWindow").should("exist");
+
+			cy.get("body").trigger("keydown", { key: "Escape", force: true });
+			cy.get("#webchatWindow").should("not.exist");
+			cy.focused().should("have.id", "webchatWindowToggleButton");
+		});
+
+		it("closes when clicking outside the widget without stealing focus", () => {
+			cy.initMockWebchat({ settings: { homeScreen: { enabled: false } } });
+			cy.openWebchat().startConversation();
+			cy.document().then(document => {
+				const outsideButton = document.createElement("button");
+				outsideButton.id = "outside-webchat";
+				outsideButton.textContent = "Outside webchat";
+				document.body.appendChild(outsideButton);
+			});
+
+			cy.get("#outside-webchat").click().should("have.focus");
+			cy.get("#webchatWindow").should("not.exist");
+		});
+
+		it("does not close when clicking inside the webchat", () => {
+			cy.initMockWebchat({ settings: { homeScreen: { enabled: false } } });
+			cy.openWebchat().startConversation();
+
+			cy.get(".webchat-input-message-input").click();
+			cy.get("#webchatWindow").should("exist");
+		});
+
 		it("returns focus to the toggle button when the chat is minimized", () => {
 			cy.initMockWebchat({ settings: { homeScreen: { enabled: false } } });
 			cy.openWebchat().startConversation();

@@ -413,6 +413,7 @@ describe("Accessibility (WCAG 2.2 AA)", () => {
 				.should("have.focus")
 				.type("{esc}");
 			cy.get("[data-xapp-overlay]").should("not.exist");
+			cy.get("#webchatWindow").should("exist");
 			cy.get(".webchat-input-message-input").should("have.focus");
 		});
 	});
@@ -420,7 +421,7 @@ describe("Accessibility (WCAG 2.2 AA)", () => {
 	it("ignores Escape when the xApp has no close icon", () => {
 		cy.withMessageFixture("xApps-overlay-noClose", () => {
 			cy.get("[data-xapp-overlay]").should("exist");
-			cy.get("body").trigger("keydown", { key: "Escape" });
+			cy.get("body").trigger("keydown", { key: "Escape", force: true });
 			cy.wait(300);
 			cy.get("[data-xapp-overlay]").should("exist");
 		});

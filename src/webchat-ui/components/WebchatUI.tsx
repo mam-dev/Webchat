@@ -324,6 +324,7 @@ export class WebchatUI extends React.PureComponent<
 	};
 
 	chatToggleButtonRef: React.RefObject<HTMLButtonElement>;
+	webchatWrapperRef: React.RefObject<HTMLDivElement>;
 	closeButtonInHeaderRef: React.RefObject<HTMLButtonElement>;
 	menuButtonInHeaderRef: React.RefObject<HTMLButtonElement>;
 	deleteButtonInHeaderRef: React.RefObject<HTMLButtonElement>;
@@ -368,6 +369,7 @@ export class WebchatUI extends React.PureComponent<
 	constructor(props) {
 		super(props);
 		this.chatToggleButtonRef = React.createRef();
+		this.webchatWrapperRef = React.createRef();
 		this.closeButtonInHeaderRef = React.createRef();
 		this.menuButtonInHeaderRef = React.createRef();
 		this.deleteButtonInHeaderRef = React.createRef();
@@ -637,6 +639,8 @@ export class WebchatUI extends React.PureComponent<
 		this.evaluateNoticeSession(this.props.prevConversations);
 
 		window.addEventListener("resize", this.handleResize);
+		document.addEventListener("keydown", this.handleDocumentKeyDown);
+		document.addEventListener("pointerdown", this.handleDocumentPointerDown, true);
 	}
 
 	// Hiding the home screen applies `inert` to its root, which blurs any
@@ -907,6 +911,9 @@ export class WebchatUI extends React.PureComponent<
 	}
 
 	componentWillUnmount() {
+		document.removeEventListener("keydown", this.handleDocumentKeyDown);
+		document.removeEventListener("pointerdown", this.handleDocumentPointerDown, true);
+
 		/**
 		 * this tears down the "unread messages" title indicator
 		 */
@@ -1182,6 +1189,26 @@ export class WebchatUI extends React.PureComponent<
 				}, 0);
 			}
 		}
+	};
+
+	private handleDocumentKeyDown = (event: KeyboardEvent) => {
+		if (!this.props.open || event.key !== "Escape") return;
+
+		const hasOpenDialog = Array.from(
+			this.webchatWindowRef.current?.querySelectorAll('[role="dialog"]') ?? [],
+		).some(dialog => dialog.getClientRects().length > 0);
+		if (hasOpenDialog) return;
+
+		event.preventDefault();
+		this.props.onMinimize();
+		this.chatToggleButtonRef.current?.focus();
+	};
+
+	private handleDocumentPointerDown = (event: PointerEvent) => {
+		if (!this.props.open || !(event.target instanceof Node)) return;
+		if (this.webchatWrapperRef.current?.contains(event.target)) return;
+
+		this.props.onMinimize();
 	};
 
 	/**
@@ -1604,6 +1631,7 @@ export class WebchatUI extends React.PureComponent<
 							allowSelectors={scrollLockAllowSelectors}
 						>
 							<WebchatWrapper
+								ref={this.webchatWrapperRef}
 								data-cognigy-webchat-root
 								{...restProps}
 								className="webchat-root"
