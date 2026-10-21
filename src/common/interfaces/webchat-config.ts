@@ -155,12 +155,20 @@ export interface IWebchatSettings {
 		iconAnimation?: string;
 		iconAnimationSpeed?: number;
 		iconAnimationInterval?: number;
+		/** Renders a pause/resume control next to the launcher while
+		 *  `iconAnimation` is set, so users can stop the motion without opening
+		 *  the chat (WCAG 2.2.2, CGY-39786). Opt-in; default false. */
+		enableIconAnimationPauseButton?: boolean;
 		watermark: "default" | "custom" | "none";
 		watermarkText: string;
 		watermarkUrl: string;
 		disableBotOutputBorder: boolean;
 		botOutputMaxWidthPercentage: number;
 		chatWindowWidth: number;
+		/** Render a gallery card's title in the text block beneath the image instead of
+		 *  overlaying it on the image (@cognigy/chat-components >= 0.78.0). Absent/false
+		 *  keeps the legacy overlay. */
+		galleryCardTitleBelowImage?: boolean;
 	};
 	colors: {
 		primaryColor: string;
@@ -239,6 +247,9 @@ export interface IWebchatSettings {
 			enabled: boolean;
 			buttonText: string;
 			title: string;
+			/** Shown in the list when there are no previous conversations; also
+			 *  the text focus lands on after "Delete all conversations" (CGY-39786). */
+			emptyListText?: string;
 		};
 		conversationStarters: {
 			enabled: boolean;
@@ -304,6 +315,12 @@ export interface IWebchatSettings {
 		urlText: string;
 		url: string;
 	};
+	systemUseNotification?: {
+		enabled: boolean;
+		title: string;
+		text: string;
+		submitButtonText: string;
+	};
 	fileAttachmentMaxSize: number;
 	maintenance: {
 		enabled: boolean;
@@ -329,6 +346,9 @@ export interface IWebchatSettings {
 		delete: string;
 		delete_anyway: string;
 		cancel: string;
+		/** Status message announced after a conversation is deleted from the chat
+		 *  options screen (SC 4.1.3, CGY-39786). */
+		conversation_deleted?: string;
 		datePickerMonthLabel?: string;
 		datePickerYearLabel?: string;
 		/** Shown when the microphone is blocked for the page (SC 3.3.1). */
@@ -339,6 +359,12 @@ export interface IWebchatSettings {
 		speech_recognition_no_speech?: string;
 		/** Shown for any other speech-recognition failure. */
 		speech_recognition_error?: string;
+		/** Attachment chip text when a file could not be uploaded (token request or upload failed). Also prefixes `file_upload_too_large` and `file_upload_infected` ("Upload Failed: File size > 10MB"). */
+		file_upload_failed?: string;
+		/** Reason appended to `file_upload_failed` in the attachment chip when the malware scan rejected the uploaded file ("Upload Failed: Infected File"). */
+		file_upload_infected?: string;
+		/** Reason appended to `file_upload_failed` in the attachment chip when a file exceeds `fileAttachmentMaxSize` ("Upload Failed: File size > 10MB"); `{maxSizeInMb}` is interpolated. */
+		file_upload_too_large?: string;
 		ariaLabels?: {
 			chatRegion?: string;
 			scrollToBottom?: string;
@@ -347,7 +373,16 @@ export interface IWebchatSettings {
 			addAttachment?: string;
 			speechToText?: string;
 			sendMessage?: string;
+			/** Name of each chip's remove button, followed by the chip's position and file name ("Remove file attachment 1, report.pdf"). */
 			removeFileAttachment?: string;
+			/** Announced (SC 4.1.3) when one attachment finished uploading; `{fileName}` is interpolated. */
+			fileAttachmentUploaded?: string;
+			/** Announced when several attachments finished uploading together; `{count}` is interpolated. */
+			fileAttachmentsUploaded?: string;
+			/** Announced when an attachment could not be uploaded; `{fileName}` and `{reason}` (the chip text) are interpolated. */
+			fileAttachmentFailed?: string;
+			/** Announced when an attachment is removed from the list; `{fileName}` is interpolated. */
+			fileAttachmentRemoved?: string;
 			closeConnectionWarning?: string;
 			goBack?: string;
 			deleteAllConversations?: string;
@@ -355,10 +390,16 @@ export interface IWebchatSettings {
 			minimizeChat?: string;
 			closeChat?: string;
 			openChat?: string;
+			/** @deprecated No longer read. The badge is decorative (`aria-hidden`); its count is conveyed by the toggle button's name (`unreadMessageSingularText` / `unreadMessagePluralText`) and announced live through the same two labels (CGY-3163). */
 			unreadMessages?: string;
 			unreadMessageSingularText?: string;
 			unreadMessagePluralText?: string;
 			closeTeaserMessage?: string;
+			/** Name of the webchat toggle (launcher) animation control while the
+			 *  animation plays; it switches to `resumeWebchatToggleAnimation`
+			 *  once paused (CGY-39786). */
+			pauseWebchatToggleAnimation?: string;
+			resumeWebchatToggleAnimation?: string;
 			thumbsUp?: string;
 			thumbsDown?: string;
 			openConversation?: string;
@@ -367,10 +408,16 @@ export interface IWebchatSettings {
 			newMessagePreview?: string;
 			opensInNewTab?: string;
 			typingIndicator?: string;
+			/** Name of the xApp overlay dialog and its frame when the xApp has
+			 *  no screen title. */
+			xAppOverlay?: string;
 			// The following is used by chat components
 			audioPlaybackProgress?: string;
 			pauseAudio?: string;
 			playAudio?: string;
+			muteAudio?: string;
+			unmuteAudio?: string;
+			audioVolume?: string;
 			playVideo?: string;
 			downloadTranscript?: string;
 			closeDatePicker?: string;
@@ -382,6 +429,17 @@ export interface IWebchatSettings {
 			datePickerNextMonth?: string;
 			datePickerGridLabel?: string;
 			datePickerGridDescription?: string;
+			datePickerRangeStart?: string;
+			datePickerRangeEnd?: string;
+			/** Appended to the name of every selected day cell, after any range word
+			 *  (default "selected"; @cognigy/chat-components >= 0.83.0). */
+			datePickerSelected?: string;
+			datePickerWeekNumber?: string;
+			datePickerAmPm?: string;
+			/** Names of the hour/minute fields in date-pickers with time selection.
+			 *  Fallback is flatpickr's locale text (@cognigy/chat-components >= 0.82.0). */
+			datePickerHour?: string;
+			datePickerMinute?: string;
 			actionButtonPositionText?: string;
 			buttonGroupLabel?: string;
 			slidesCountText?: string;
@@ -411,6 +469,9 @@ export interface IWebchatSettings {
 				timestamp?: string;
 			};
 			audioTimeRemaining?: string;
+			audioMoreOptions?: string;
+			audioPlaybackSpeed?: string;
+			audioNormalSpeed?: string;
 		};
 	};
 	demoWebchat: {
