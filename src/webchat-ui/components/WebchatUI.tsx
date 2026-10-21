@@ -1206,7 +1206,9 @@ export class WebchatUI extends React.PureComponent<
 
 	private handleDocumentPointerDown = (event: PointerEvent) => {
 		if (!this.props.open || !(event.target instanceof Node)) return;
-		if (this.webchatWrapperRef.current?.contains(event.target)) return;
+		const targetIsInWrapper = this.webchatWrapperRef.current?.contains(event.target);
+		const targetIsViewportWindow = event.target === this.webchatWindowRef.current;
+		if (targetIsInWrapper && !targetIsViewportWindow) return;
 
 		this.props.onMinimize();
 	};

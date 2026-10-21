@@ -88,6 +88,14 @@ describe("Focus management (WCAG 2.2 AA)", () => {
 			cy.get("#webchatWindow").should("not.exist");
 		});
 
+		it("closes when an outside click hits the viewport-sized chat window", () => {
+			cy.initMockWebchat({ settings: { homeScreen: { enabled: false } } });
+			cy.openWebchat().startConversation();
+
+			cy.get("#webchatWindow").click("topLeft", { force: true });
+			cy.get("#webchatWindow").should("not.exist");
+		});
+
 		it("does not close when clicking inside the webchat", () => {
 			cy.initMockWebchat({ settings: { homeScreen: { enabled: false } } });
 			cy.openWebchat().startConversation();
