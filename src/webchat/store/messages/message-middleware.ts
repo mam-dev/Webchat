@@ -141,10 +141,17 @@ export const createMessageMiddleware =
 
 				client.sendMessage(text || "", data);
 
-				const { immediateTypingIndicator } =
-					store.getState().config.settings.behavior;
+				const { immediateTypingIndicator } = store.getState().config.settings.behavior;
 
-				if (typeof immediateTypingIndicator === "number") {
+				// Control commands (e.g. setRating, acceptPrivacyPolicy) don't trigger a
+				// bot reply, so nothing would ever remove the typing indicator again.
+				const controlCommands = (
+					data?._cognigy as { controlCommands?: unknown } | undefined
+				)?.controlCommands;
+				const isControlCommand =
+					!text && Array.isArray(controlCommands) && controlCommands.length > 0;
+
+				if (typeof immediateTypingIndicator === "number" && !isControlCommand) {
 					setTimeout(() => {
 						store.dispatch(setTyping("show"));
 					}, immediateTypingIndicator);

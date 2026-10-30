@@ -234,6 +234,38 @@ describe("Rating", () => {
 		cy.get(".webchat-toast-notification").should("contain.text", "Your feedback was submitted");
 	});
 
+	it("does not show the immediate typing indicator after submitting feedback from the menu", () => {
+		cy.initMockWebchat({
+			settings: {
+				behavior: {
+					immediateTypingIndicator: 0,
+				},
+				chatOptions: {
+					enabled: true,
+					title: chatOptionsTitle,
+					rating: {
+						enabled: "always",
+					},
+				},
+			},
+		});
+		cy.openWebchat().startConversation();
+
+		cy.get(`[aria-label="${chatOptionsTitle}"]`).click();
+		cy.get('[aria-label="Like"]').click();
+		cy.get('[data-test="rating-input"]').type("Great chat");
+		cy.get(".webchat-rating-widget-send-button").click();
+
+		cy.get(".webchat-toast-notification").should("contain.text", "Your feedback was submitted");
+		// The setRating control command gets no bot reply, so an indicator would never be removed.
+		cy.wait(500);
+		cy.get(".webchat-typing-indicator").should("not.be.visible");
+
+		// A regular user message still shows it.
+		cy.sendMessage("hello");
+		cy.get(".webchat-typing-indicator").should("be.visible");
+	});
+
 	it("displays only rating widget when request rating arrives, hiding other chat options", () => {
 		cy.initMockWebchat({
 			settings: {

@@ -86,6 +86,32 @@ describe("Privacy Notice", () => {
 			.and("have.attr", "rel", "noopener noreferrer");
 	});
 
+	it("does not show the immediate typing indicator after accepting the privacy notice", () => {
+		cy.initMockWebchat({
+			settings: {
+				behavior: {
+					immediateTypingIndicator: 0,
+				},
+				privacyNotice: {
+					enabled: true,
+				},
+			},
+		});
+
+		cy.openWebchat();
+		cy.startConversation();
+		cy.get(".webchat-privacy-notice-accept-button").click();
+		cy.get(".webchat-privacy-notice-root").should("not.exist");
+
+		// The acceptPrivacyPolicy control command gets no bot reply, so an indicator would never be removed.
+		cy.wait(500);
+		cy.get(".webchat-typing-indicator").should("not.be.visible");
+
+		// A regular user message still shows it.
+		cy.sendMessage("hello");
+		cy.get(".webchat-typing-indicator").should("be.visible");
+	});
+
 	// Accessibility (WCAG 2.2 AA) — scoped to the widget root. See docs/accessibility.md.
 	describe("Accessibility (WCAG 2.2 AA)", () => {
 		const privacyNotice = {
