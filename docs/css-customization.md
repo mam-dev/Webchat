@@ -94,6 +94,8 @@ There are several classes that you need to take in consideration if you want to 
 - _webchat-rating-widget-comment-input-field-label_
 - _webchat-rating-widget-comment-input-field_
 - _webchat-rating-widget-send-button_
+- _webchat-rating-submitted-root_
+- _webchat-rating-submitted-text_
 - _webchat-tts-option-root_
 - _webchat-chat-options-tts-option-label_
 - _webchat-chat-options-tts-option-toggle_
@@ -1149,6 +1151,28 @@ Please note that this rating widget is used in rating section of the Chat Option
 ```CSS
 [data-cognigy-webchat-root] [data-cognigy-webchat] .webchat-rating-widget-send-button {
     background-color: rgb(5, 5, 131) !important;
+}
+```
+
+#### Rating Submitted
+
+Replaces the rating widget once feedback was given: in the rating section of the Chat Options screen when rating is set to `"once"`, and on every later rating screen opened by the Request Rating Flow Node. It shows the rating title (_webchat-rating-widget-title_) and the event banner text as a fixed element.
+
+- _webchat-rating-submitted-root_  
+  The root container for the rating title and the submitted confirmation.
+
+```CSS
+[data-cognigy-webchat-root] [data-cognigy-webchat] .webchat-rating-submitted-root {
+    padding: 24px 0 !important;
+}
+```
+
+- _webchat-rating-submitted-text_  
+  The confirmation text ("Your feedback was submitted" or the configured event banner text).
+
+```CSS
+[data-cognigy-webchat-root] [data-cognigy-webchat] .webchat-rating-submitted-text {
+    border-radius: 4px !important;
 }
 ```
 

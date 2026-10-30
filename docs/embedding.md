@@ -298,13 +298,13 @@ With either `enableIndicator` or `enableBadge` on, the unread count is also anno
 
 ##### Chat Options Rating Section
 
-| Name               | Type   | Default                              | Description                                                                                                                    |
-| ------------------ | ------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| enabled            | string | `"once"`                             | Allowed values: `"no" \| "once" \| "always"`. Decide how often a user can give feedback from this section. Hidden not enabled. |
-| title              | string | `"Please rate your chat experience"` | Configure the title for the Rating Section                                                                                     |
-| commentPlaceholder | string | `"Type something here..."`           | Placeholder text that will be displayed in the rating comment field                                                            |
-| submitButtonText   | string | `"Send feedback"`                    | Text on the rating submit button                                                                                               |
-| eventBannerText    | string | `"Your feedback was submitted"`      | Event Banner text after user sent feedback                                                                                     |
+| Name               | Type   | Default                              | Description                                                                                                                                                                                                                             |
+| ------------------ | ------ | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| enabled            | string | `"once"`                             | Allowed values: `"no" \| "once" \| "always"`. Decide how often a user can give feedback from this section. Hidden not enabled. With `"once"`, the section shows the event banner text as a fixed confirmation after feedback was given. |
+| title              | string | `"Please rate your chat experience"` | Configure the title for the Rating Section                                                                                                                                                                                              |
+| commentPlaceholder | string | `"Type something here..."`           | Placeholder text that will be displayed in the rating comment field                                                                                                                                                                     |
+| submitButtonText   | string | `"Send feedback"`                    | Text on the rating submit button                                                                                                                                                                                                        |
+| eventBannerText    | string | `"Your feedback was submitted"`      | Event Banner text after user sent feedback. Also shown as the fixed confirmation once feedback was given.                                                                                                                               |
 
 ##### Chat Options Footer
 

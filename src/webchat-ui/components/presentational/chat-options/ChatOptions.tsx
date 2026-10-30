@@ -5,6 +5,7 @@ import { StoreState } from "../../../../webchat/store/store";
 import { setTTSActive } from "../../../../webchat/store/ui/ui-reducer";
 import { IWebchatConfig } from "../../../../common/interfaces/webchat-config";
 import { RatingWidget } from "./RatingWidget";
+import { RatingSubmitted } from "./RatingSubmitted";
 import { PostbackButtons } from "./PostbackButtons";
 import { WebchatUIProps } from "../../WebchatUI";
 import { ChatOptionsFooter } from "./ChatOptionsFooter";
@@ -80,10 +81,25 @@ export const ChatOptions = (props: IChatOptionsProps) => {
 	const { chatOptions } = settings;
 
 	const ratingEnabled = chatOptions.rating.enabled;
-	const showRating =
-		ratingEnabled === "always" ||
-		(ratingEnabled === "once" && !hasGivenRating) ||
-		showOnlyRating;
+	const showRating = ratingEnabled === "always" || ratingEnabled === "once" || showOnlyRating;
+	// A repeat bot request always shows the confirmation; the Menu only with "once".
+	const showRatingSubmitted = hasGivenRating && (showOnlyRating || ratingEnabled === "once");
+
+	const ratingSection = showRatingSubmitted ? (
+		<RatingSubmitted
+			ratingTitleText={ratingTitleText}
+			ratingEventBannerText={ratingEventBannerText}
+		/>
+	) : (
+		<RatingWidget
+			ratingTitleText={ratingTitleText}
+			ratingCommentText={ratingCommentText}
+			onSendRating={onSendRating}
+			showRatingStatus={showOnlyRating}
+			ratingEventBannerText={ratingEventBannerText}
+			buttonText={ratingSubmitButtonText}
+		/>
+	);
 
 	const ttsEnabled = useSelector((state: StoreState) => state.ui.ttsActive);
 	const dispatch = useDispatch();
@@ -98,14 +114,7 @@ export const ChatOptions = (props: IChatOptionsProps) => {
 			<ChatOptionsContainer className="webchat-chat-options-container">
 				{showOnlyRating ? (
 					// Rating Screen
-					<RatingWidget
-						ratingTitleText={ratingTitleText}
-						ratingCommentText={ratingCommentText}
-						onSendRating={onSendRating}
-						showRatingStatus={showOnlyRating}
-						ratingEventBannerText={ratingEventBannerText}
-						buttonText={ratingSubmitButtonText}
-					/>
+					ratingSection
 				) : (
 					// Chat Options Screen
 					<>
@@ -131,14 +140,7 @@ export const ChatOptions = (props: IChatOptionsProps) => {
 						)}
 						{showRating && (
 							<>
-								<RatingWidget
-									ratingTitleText={ratingTitleText}
-									ratingCommentText={ratingCommentText}
-									onSendRating={onSendRating}
-									showRatingStatus={showOnlyRating}
-									ratingEventBannerText={ratingEventBannerText}
-									buttonText={ratingSubmitButtonText}
-								/>
+								{ratingSection}
 								<DividerWrapper>
 									<Divider />
 								</DividerWrapper>

@@ -209,6 +209,105 @@ describe("Rating", () => {
 		cy.get('[data-test="rating-input"]').should("not.exist");
 	});
 
+	it("shows the submitted confirmation in the menu after rating once", () => {
+		cy.initMockWebchat({
+			settings: {
+				chatOptions: {
+					enabled: true,
+					title: chatOptionsTitle,
+					rating: {
+						enabled: "once",
+						eventBannerText: "Thanks for your feedback",
+					},
+				},
+			},
+		});
+		cy.openWebchat().startConversation();
+
+		cy.get(`[aria-label="${chatOptionsTitle}"]`).click();
+		cy.get('[aria-label="Like"]').click();
+		cy.get(".webchat-rating-widget-send-button").click();
+		cy.get(".webchat-chat-options-root").should("not.exist");
+
+		cy.get(`[aria-label="${chatOptionsTitle}"]`).click();
+
+		cy.get(".webchat-rating-submitted-root")
+			.should("be.visible")
+			.within(() => {
+				cy.get(".webchat-rating-widget-title").should(
+					"have.text",
+					"Please rate your chat experience",
+				);
+				cy.get(".webchat-rating-submitted-text").should(
+					"have.text",
+					"Thanks for your feedback",
+				);
+			});
+		cy.get(".webchat-rating-widget-root").should("not.exist");
+		cy.get('[data-test="rating-input"]').should("not.exist");
+	});
+
+	it("keeps the rating form in the menu after rating when set to always", () => {
+		cy.initMockWebchat({
+			settings: {
+				chatOptions: {
+					enabled: true,
+					title: chatOptionsTitle,
+					rating: {
+						enabled: "always",
+					},
+				},
+			},
+		});
+		cy.openWebchat().startConversation();
+
+		cy.get(`[aria-label="${chatOptionsTitle}"]`).click();
+		cy.get('[aria-label="Like"]').click();
+		cy.get(".webchat-rating-widget-send-button").click();
+		cy.get(".webchat-chat-options-root").should("not.exist");
+
+		cy.get(`[aria-label="${chatOptionsTitle}"]`).click();
+
+		cy.get('[data-test="rating-input"]').should("exist");
+		cy.get(".webchat-rating-submitted-root").should("not.exist");
+	});
+
+	it("shows the submitted confirmation when the bot requests a rating again", () => {
+		cy.initMockWebchat();
+		cy.openWebchat().startConversation();
+
+		const requestRating = () =>
+			cy.receiveMessage(
+				"",
+				{
+					_plugin: {
+						type: "request-rating",
+						data: {
+							ratingTitleText: "rating title",
+							ratingCommentText: "rating text",
+							ratingEventBannerText: "Thanks, we got it",
+						},
+					},
+				},
+				"bot",
+			);
+
+		requestRating();
+		cy.get('[aria-label="Like"]').click();
+		cy.get(".webchat-rating-widget-send-button").click();
+		cy.get(".webchat-chat-history").contains("Feedback submitted");
+
+		requestRating();
+
+		cy.get(".webchat-rating-submitted-root")
+			.should("be.visible")
+			.within(() => {
+				cy.get(".webchat-rating-widget-title").should("have.text", "rating title");
+				cy.get(".webchat-rating-submitted-text").should("have.text", "Thanks, we got it");
+			});
+		cy.get(".webchat-rating-widget-root").should("not.exist");
+	});
+
 	it("returns to the chat after submitting feedback from the menu", () => {
 		cy.initMockWebchat({
 			settings: {
@@ -486,6 +585,33 @@ describe("Rating", () => {
 				.should("be.visible")
 				.and("contain.text", "Your feedback was submitted");
 			cy.get(".webchat-toast-notification [aria-live='off']").should("exist");
+			cy.checkA11yCompliance("[data-cognigy-webchat-root]");
+		});
+
+		it("submitted confirmation has no detectable a11y violations (incl. contrast)", () => {
+			cy.initMockWebchat({
+				settings: {
+					chatOptions: {
+						enabled: true,
+						title: chatOptionsTitle,
+						rating: {
+							enabled: "once",
+						},
+					},
+				},
+			});
+			cy.openWebchat().startConversation();
+
+			cy.get(`[aria-label="${chatOptionsTitle}"]`).click();
+			cy.get('[aria-label="Like"]').click();
+			cy.get(".webchat-rating-widget-send-button").click();
+			cy.get(".webchat-chat-options-root").should("not.exist");
+			// Let the toast leave, so axe only checks the fixed confirmation.
+			cy.get(".webchat-toast-notification").should("be.visible");
+			cy.get(".webchat-toast-notification", { timeout: 6000 }).should("not.exist");
+
+			cy.get(`[aria-label="${chatOptionsTitle}"]`).click();
+			cy.get(".webchat-rating-submitted-text").should("be.visible");
 			cy.checkA11yCompliance("[data-cognigy-webchat-root]");
 		});
 
