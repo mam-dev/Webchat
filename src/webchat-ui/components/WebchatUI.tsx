@@ -1236,6 +1236,10 @@ export class WebchatUI extends React.PureComponent<
 		const wasRatingScreen = this.props.showRatingScreen;
 
 		this.props.onShowRatingScreen(false);
+		// Submitting from the Menu returns to the chat, like the Menu's back button.
+		if (!wasRatingScreen) {
+			this.props.onSetShowChatOptionsScreen(false);
+		}
 
 		this.props.onSendMessage(
 			undefined,
@@ -1258,22 +1262,26 @@ export class WebchatUI extends React.PureComponent<
 
 		this.props.onSetHasGivenRating();
 
-		// Submitting from the chat options screen removes the focused Send
-		// button (rating "once" unmounts the widget; "always" disables it),
-		// which would drop focus to document.body (SC 2.4.3 Focus Order).
-		// Move focus to the screen title instead, mirroring the
-		// autoFocusScreenTitle pattern in Header. The request-rating screen
-		// path is excluded: it closes the screen and the message input
+		// Submitting from the Menu closes it, which removes the focused Send
+		// button and would drop focus to document.body (SC 2.4.3 Focus Order).
+		// The chat screen re-focuses its message input (200ms autofocus). The
+		// header title is only a fallback when focus is still on document.body
+		// after that, e.g. with `disableInputAutofocus`. The request-rating
+		// screen path is excluded: it closes the screen and the message input
 		// takes focus on mount.
 		// Scoped to the header bar because id "webchatHeaderTitle" is
 		// duplicated across Header, HomeScreen and TeaserMessage.
 		if (!wasRatingScreen) {
 			if (this.ratingFocusTimeout) clearTimeout(this.ratingFocusTimeout);
 			this.ratingFocusTimeout = setTimeout(() => {
-				this.webchatWindowRef?.current
-					?.querySelector<HTMLElement>(".webchat-header-bar .webchat-header-title")
+				this.ratingFocusTimeout = null;
+				const webchatWindowEl = this.webchatWindowRef?.current;
+				const active = document.activeElement;
+				if (!webchatWindowEl || (active !== document.body && active !== null)) return;
+				webchatWindowEl
+					.querySelector<HTMLElement>(".webchat-header-bar .webchat-header-title")
 					?.focus();
-			}, 200);
+			}, 450);
 		}
 	};
 

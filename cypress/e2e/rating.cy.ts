@@ -209,6 +209,31 @@ describe("Rating", () => {
 		cy.get('[data-test="rating-input"]').should("not.exist");
 	});
 
+	it("returns to the chat after submitting feedback from the menu", () => {
+		cy.initMockWebchat({
+			settings: {
+				chatOptions: {
+					enabled: true,
+					title: chatOptionsTitle,
+					rating: {
+						enabled: "always",
+					},
+				},
+			},
+		});
+		cy.openWebchat().startConversation();
+
+		cy.get(`[aria-label="${chatOptionsTitle}"]`).click();
+
+		cy.get('[aria-label="Like"]').click();
+		cy.get('[data-test="rating-input"]').type("Great chat");
+		cy.get(".webchat-rating-widget-send-button").click();
+
+		cy.get(".webchat-chat-options-root").should("not.exist");
+		cy.get(".webchat-chat-history").should("be.visible");
+		cy.get(".webchat-toast-notification").should("contain.text", "Your feedback was submitted");
+	});
+
 	it("displays only rating widget when request rating arrives, hiding other chat options", () => {
 		cy.initMockWebchat({
 			settings: {
@@ -378,12 +403,12 @@ describe("Rating", () => {
 			cy.get('[aria-label="Like"]').click();
 			cy.get(".webchat-rating-widget-send-button").click();
 
-			cy.get(".webchat-header-bar .webchat-header-title").should("have.focus");
+			cy.focused().closest("[data-cognigy-webchat-root]").should("exist");
 		});
 
-		it("moves focus to the screen title after submitting feedback with rating 'always' (SC 2.4.3)", () => {
-			// With rating "always" the widget stays but the focused Send button
-			// becomes disabled, which would also drop focus to document.body.
+		it("keeps focus inside the widget after submitting feedback with rating 'always' (SC 2.4.3)", () => {
+			// The Menu closes on submit, which would otherwise drop focus to
+			// document.body.
 			cy.initMockWebchat({
 				settings: {
 					chatOptions: {
@@ -401,7 +426,7 @@ describe("Rating", () => {
 			cy.get('[aria-label="Like"]').click();
 			cy.get(".webchat-rating-widget-send-button").click();
 
-			cy.get(".webchat-header-bar .webchat-header-title").should("have.focus");
+			cy.focused().closest("[data-cognigy-webchat-root]").should("exist");
 		});
 
 		it("status notification toast has no detectable a11y violations (incl. contrast)", () => {
